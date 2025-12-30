@@ -15,6 +15,7 @@ from tqdm.auto import tqdm
 import threading
 import signal
 import argparse
+import json
 
 
 CLOUDFLARED_CONFIG = {
@@ -114,11 +115,11 @@ def _download_file(url):
         file_size = int(r.headers.get("content-length", 50000000))  # type: ignore
         chunk_size = 1024
         with tqdm(
-            desc=" * Downloading",
-            total=file_size,
-            unit="B",
-            unit_scale=True,
-            unit_divisor=1024,
+                desc=" * Downloading",
+                total=file_size,
+                unit="B",
+                unit_scale=True,
+                unit_divisor=1024,
         ) as pbar:
             for chunk in r.iter_content(chunk_size=chunk_size):
                 f.write(chunk)
@@ -130,6 +131,7 @@ def _run_cloudflared():
     parser = argparse.ArgumentParser(description="Run Cloudflared tunnel")
 
     # Define options
+    parser.add_argument('-i', '--project_id', type=str, help='the project_id for the tunnel',required=True)
     parser.add_argument('-p', '--port', type=int, help='the port to tunnel',required=True)
     parser.add_argument('-m', '--metrics_port', type=int, help='the metrics port to tunnel')
     parser.add_argument('-t', '--tunnel_id', type=int, help='the tunnel id to tunnel')
@@ -138,16 +140,13 @@ def _run_cloudflared():
 
     # Parse arguments
     args = parser.parse_args()
-
     port = args.port
+    project_id = args.project_id
 
-    metrics_port = args.metrics_port
     metrics_port =  randint(8100, 9000) if args.metrics_port is None else args.metrics_port
 
     tunnel_id = args.tunnel_id
     config_path = args.config_path
-    # token = args.token
-
     system, machine = platform.system(), platform.machine()
     command = _get_command(system, machine)
     cloudflared_path = str(Path(tempfile.gettempdir()))
@@ -208,8 +207,42 @@ def _run_cloudflared():
             time.sleep(3)
     else:
         raise Exception(f"! Can't connect to Cloudflare Edge")
+
+    handle_proxy(project_id,tunnel_url)
     print(f" * Running on {tunnel_url}")
     print(f" * Traffic stats available on http://127.0.0.1:{metrics_port}/metrics")
+
+
+def handle_proxy(project_id,tunnel_url):
+    worker_proxy_path = f"/tmp/{project_id}"
+
+    if not os.path.exists(worker_proxy_path):
+        current_file_dir = os.path.dirname(os.path.abspath(__file__))
+        subprocess.Popen(
+            ["cp", "-a",current_file_dir,worker_proxy_path], stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT
+        )
+
+    wrangler_jsonc = f"{worker_proxy_path}/wrangler.jsonc"
+
+    # 1) read file
+    with open(wrangler_jsonc, "r", encoding="utf-8") as f:
+        content = f.read()
+
+
+    # 3) parse json
+    wrangler_jsonc_data = json.loads(content)
+
+    # 4) modify PROXY_URL
+    wrangler_jsonc_data['vars']["PROXY_URL"] = tunnel_url
+
+    # 5) write back as JSONC-compatible text (pretty JSON)
+    with open(wrangler_jsonc, "w", encoding="utf-8") as f:
+        json.dump(wrangler_jsonc_data, f, indent=2)
+    os.chdir(worker_proxy_path)
+    print("deploy...")
+    subprocess.Popen(
+        ["npm","run","deploy"]
+    )
 
 def main():
     print(" * Starting Cloudflared tunnel...")
