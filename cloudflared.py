@@ -218,8 +218,8 @@ def handle_proxy(project_id,tunnel_url):
 
     if not os.path.exists(worker_proxy_path):
         current_file_dir = os.path.dirname(os.path.abspath(__file__))
-        subprocess.Popen(
-            ["cp", "-a",current_file_dir,worker_proxy_path], stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT
+        subprocess.run(
+            ["cp", "-a",current_file_dir,worker_proxy_path],check=True
         )
 
     wrangler_jsonc = f"{worker_proxy_path}/wrangler.jsonc"
@@ -240,8 +240,8 @@ def handle_proxy(project_id,tunnel_url):
         json.dump(wrangler_jsonc_data, f, indent=2)
     os.chdir(worker_proxy_path)
     print("deploy...")
-    subprocess.Popen(
-        ["npm","run","deploy"]
+    subprocess.run(
+        ["npm","run","deploy"],check=True
     )
 
 def main():
