@@ -228,12 +228,12 @@ def handle_proxy(project_id,tunnel_url):
     with open(wrangler_jsonc, "r", encoding="utf-8") as f:
         content = f.read()
 
-
     # 3) parse json
     wrangler_jsonc_data = json.loads(content)
 
     # 4) modify PROXY_URL
     wrangler_jsonc_data['vars']["PROXY_URL"] = tunnel_url
+    wrangler_jsonc_data['name'] = "proxt_"+project_id
 
     # 5) write back as JSONC-compatible text (pretty JSON)
     with open(wrangler_jsonc, "w", encoding="utf-8") as f:
