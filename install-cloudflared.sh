@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 set -e
 
+# bash <(curl -fsSL https://raw.githubusercontent.com/cloudflare/cloudflared/master/install.sh)
+
+
 # Path to your downloaded cloudflared binary (edit if needed)
 CLOUDFLARED_FILE="./cloudflared"
 
