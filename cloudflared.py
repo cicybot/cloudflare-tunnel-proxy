@@ -176,8 +176,9 @@ def _run_cloudflared():
 
     executable = str(Path(cloudflared_path, command))
     os.chmod(executable, 0o777)
-
+	print("[executable]",executable)
     if download:
+		
         return
 
     cloudflared_command = [
@@ -229,12 +230,12 @@ def _run_cloudflared():
 
     print(f" * Running on {tunnel_url}")
     print(f" * Traffic stats at http://127.0.0.1:{metrics_port}/metrics")
-
+	signal.pause()
 
 def main():
     print(" * Starting Cloudflared tunnel...")
     _run_cloudflared()
-    signal.pause()
+    
 
 
 if __name__ == "__main__":
