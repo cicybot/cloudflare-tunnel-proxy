@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -e
 
-# bash <(curl -fsSL https://raw.githubusercontent.com/cloudflare/cloudflared/master/install.sh)
+# bash <(curl -fsSL https://raw.githubusercontent.com/cicybot/cloudflare-tunnel-proxy/refs/heads/main/install-cloudflared.sh)
 
 
 # Path to your downloaded cloudflared binary (edit if needed)
