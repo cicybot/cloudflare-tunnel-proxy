@@ -56,34 +56,35 @@ CLOUDFLARED_CONFIG = {
 }
 
 
-def _get_command(system, machine):
+def _get_command(system: str, machine: str) -> str:
     try:
         return CLOUDFLARED_CONFIG[(system, machine)]["command"]
     except KeyError:
         raise Exception(f"{machine} is not supported on {system}")
 
 
-def _get_url(system, machine):
+def _get_url(system: str, machine: str) -> str:
     try:
         return CLOUDFLARED_CONFIG[(system, machine)]["url"]
     except KeyError:
         raise Exception(f"{machine} is not supported on {system}")
 
 
-def _extract_tarball(tar_path, filename):
-    with tarfile.open(os.path.join(tar_path, filename), "r") as tar:
+def _extract_tarball(tar_path: str, filename: str) -> None:
+    tarfile_path = os.path.join(tar_path, filename)
+    with tarfile.open(tarfile_path, "r") as tar:
         tar.extractall(tar_path)
 
 
-def _download_file(url):
+def _download_file(url: str) -> str:
     local_filename = url.split("/")[-1]
-    r = requests.get(url, stream=True)
-    r.raise_for_status()
+    response = requests.get(url, stream=True)
+    response.raise_for_status()
 
     download_path = str(Path(tempfile.gettempdir(), local_filename))
 
     with open(download_path, "wb") as f:
-        file_size = int(r.headers.get("content-length", 50000000))
+        file_size = int(response.headers.get("content-length", 50_000_000))
         chunk_size = 1024
 
         with tqdm(
@@ -93,14 +94,15 @@ def _download_file(url):
             unit_scale=True,
             unit_divisor=1024,
         ) as pbar:
-            for chunk in r.iter_content(chunk_size=chunk_size):
-                f.write(chunk)
-                pbar.update(len(chunk))
+            for chunk in response.iter_content(chunk_size=chunk_size):
+                if chunk:
+                    f.write(chunk)
+                    pbar.update(len(chunk))
 
     return download_path
 
 
-def _download_cloudflared(cloudflared_path, command):
+def _download_cloudflared(cloudflared_path: str, command: str) -> None:
     system, machine = platform.system(), platform.machine()
 
     if Path(cloudflared_path, command).exists():
@@ -122,7 +124,7 @@ def _download_cloudflared(cloudflared_path, command):
     _download_file(url)
 
 
-def handle_proxy(project_id, tunnel_url):
+def handle_proxy(project_id: str, tunnel_url: str) -> None:
     worker_proxy_path = f"/tmp/{project_id}"
 
     if not os.path.exists(worker_proxy_path):
@@ -135,7 +137,7 @@ def handle_proxy(project_id, tunnel_url):
         wrangler_jsonc_data = json.load(f)
 
     wrangler_jsonc_data["vars"]["PROXY_URL"] = tunnel_url
-    wrangler_jsonc_data["name"] = "proxy_" + project_id
+    wrangler_jsonc_data["name"] = f"proxy_{project_id}"
 
     with open(wrangler_jsonc, "w", encoding="utf-8") as f:
         json.dump(wrangler_jsonc_data, f, indent=2)
@@ -145,7 +147,7 @@ def handle_proxy(project_id, tunnel_url):
     subprocess.run(["npm", "run", "deploy"], check=True)
 
 
-def _run_cloudflared():
+def _run_cloudflared() -> None:
     parser = argparse.ArgumentParser(description="Run Cloudflared tunnel")
 
     parser.add_argument("-i", "--project_id", required=True)
@@ -159,7 +161,6 @@ def _run_cloudflared():
 
     port = args.port
     project_id = args.project_id
-    download = args.download
 
     metrics_port = randint(8100, 9000) if args.metrics_port is None else args.metrics_port
 
@@ -176,9 +177,10 @@ def _run_cloudflared():
 
     executable = str(Path(cloudflared_path, command))
     os.chmod(executable, 0o777)
-	print("[executable]",executable)
-    if download:
-		
+
+    print("[executable]", executable)
+
+    if args.download:
         return
 
     cloudflared_command = [
@@ -210,32 +212,35 @@ def _run_cloudflared():
 
     localhost_url = f"http://127.0.0.1:{metrics_port}/metrics"
 
+    tunnel_url = None
+
     for _ in range(10):
         try:
             metrics = requests.get(localhost_url).text
-            tunnel_url_match = re.search(
-                r"(?P<url>https?:\/\/[^\s]+.trycloudflare.com)",
-                metrics,
-            )
-            if tunnel_url_match:
-                tunnel_url = tunnel_url_match.group("url")
+            match = re.search(r"(?P<url>https?://[^\s]+\.trycloudflare\.com)", metrics)
+
+            if match:
+                tunnel_url = match.group("url")
                 break
+
             time.sleep(3)
         except Exception:
             time.sleep(3)
-    else:
+
+    if not tunnel_url:
         raise Exception("Can't connect to Cloudflare Edge")
 
     handle_proxy(project_id, tunnel_url)
 
     print(f" * Running on {tunnel_url}")
     print(f" * Traffic stats at http://127.0.0.1:{metrics_port}/metrics")
-	signal.pause()
+
+    signal.pause()
+
 
 def main():
     print(" * Starting Cloudflared tunnel...")
     _run_cloudflared()
-    
 
 
 if __name__ == "__main__":
