@@ -136,12 +136,15 @@ def _run_cloudflared():
     parser.add_argument('-m', '--metrics_port', type=int, help='the metrics port to tunnel')
     parser.add_argument('-t', '--tunnel_id', type=int, help='the tunnel id to tunnel')
     parser.add_argument('-c', '--config_path', type=int, help='the config path to tunnel')
+	parser.add_argument('-d', '--download', type=int, help='download cloudflared')
     # parser.add_argument('-o', '--token', type=int, help='the token to tunnel')
 
     # Parse arguments
     args = parser.parse_args()
     port = args.port
     project_id = args.project_id
+    project_id = args.download
+
 
     metrics_port =  randint(8100, 9000) if args.metrics_port is None else args.metrics_port
 
@@ -158,6 +161,9 @@ def _run_cloudflared():
 
     executable = str(Path(cloudflared_path, command))
     os.chmod(executable, 0o777)
+	
+	if download is not None:
+		return
 
     cloudflared_command = [
         executable,
